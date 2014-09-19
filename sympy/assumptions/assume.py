@@ -2,7 +2,6 @@ from __future__ import print_function, division
 
 import inspect
 from sympy.core.cache import cacheit
-from sympy.core.singleton import S
 from sympy.core.sympify import _sympify
 from sympy.logic.boolalg import Boolean
 from sympy.logic.FOL import Applied, Callable
