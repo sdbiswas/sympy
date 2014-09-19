@@ -7,7 +7,9 @@ from collections import defaultdict, deque
 from itertools import chain, combinations, product
 
 from sympy.core import Symbol
+from sympy.core.cache import cacheit
 from sympy.core.compatibility import iterable, ordered
+from sympy.core.singleton import S
 from sympy.logic.boolalg import (And, Boolean, BooleanFunction,
     conjuncts, disjuncts, eliminate_implications, false, Implies,
     Not, Or, to_cnf, true)
@@ -58,6 +60,10 @@ class Callable(FOL):
     def _sympystr(self, *args, **kwargs):
         return self.name
 
+    @cacheit
+    def sort_key(self, order=None):
+        return self.class_key(), (1, (self.name,)), S.One.sort_key(), S.One
+
     @classmethod
     def apply(cls):
         """
@@ -104,6 +110,10 @@ class Applied(FOL):
     def _sympystr(self, *args, **kwargs):
         return "%s(%s)" % (self.name,
             ', '.join(str(arg) for arg in self.args))
+
+    @cacheit
+    def sort_key(self, order=None):
+        return self.class_key(), (2, (self.func.name, self.arg.sort_key())), S.One.sort_key(), S.One
 
     @property
     def name(self):

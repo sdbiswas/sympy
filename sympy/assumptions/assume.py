@@ -5,6 +5,7 @@ from sympy.core.cache import cacheit
 from sympy.core.singleton import S
 from sympy.core.sympify import _sympify
 from sympy.logic.boolalg import Boolean
+from sympy.logic.FOL import Applied, Callable
 from sympy.utilities.source import get_class
 from contextlib import contextmanager
 
@@ -42,7 +43,7 @@ class AssumptionsContext(set):
 global_assumptions = AssumptionsContext()
 
 
-class AppliedPredicate(Boolean):
+class AppliedAssumptionsPredicate(Applied):
     """The class of expressions resulting from applying a Predicate.
 
     Examples
@@ -57,12 +58,6 @@ class AppliedPredicate(Boolean):
 
     """
     __slots__ = []
-
-    def __new__(cls, predicate, arg):
-        if not isinstance(arg, bool):
-            # XXX: There is not yet a Basic type for True and False
-            arg = _sympify(arg)
-        return Boolean.__new__(cls, predicate, arg)
 
     is_Atom = True  # do not attempt to decompose this
 
@@ -81,33 +76,16 @@ class AppliedPredicate(Boolean):
         x + 1
 
         """
-        return self._args[1]
-
-    @property
-    def args(self):
-        return self._args[1:]
-
-    @property
-    def func(self):
         return self._args[0]
-
-    @cacheit
-    def sort_key(self, order=None):
-        return self.class_key(), (2, (self.func.name, self.arg.sort_key())), S.One.sort_key(), S.One
-
-    def __eq__(self, other):
-        if type(other) is AppliedPredicate:
-            return self._args == other._args
-        return False
-
-    def __hash__(self):
-        return super(AppliedPredicate, self).__hash__()
 
     def _eval_ask(self, assumptions):
         return self.func.eval(self.arg, assumptions)
 
+    def _sympystr(self, *args, **kwargs):
+        return "Q.%s(%s)" % (self.name, self.arg)
 
-class Predicate(Boolean):
+
+class AssumptionsPredicate(Callable):
     """A predicate is a function that returns a boolean value.
 
     Predicates merely wrap their argument and remain unevaluated:
@@ -135,19 +113,14 @@ class Predicate(Boolean):
     is_Atom = True
 
     def __new__(cls, name, handlers=None):
-        obj = Boolean.__new__(cls)
-        obj.name = name
-        obj.handlers = handlers or []
-        return obj
+        return Boolean.__new__(cls)
 
-    def _hashable_content(self):
-        return (self.name,)
+    def __init__(self, name, handlers=None):
+        super(AssumptionsPredicate, self).__init__(name)
+        self.handlers = handlers or []
 
     def __getnewargs__(self):
         return (self.name,)
-
-    def __call__(self, expr):
-        return AppliedPredicate(self, expr)
 
     def add_handler(self, handler):
         self.handlers.append(handler)
@@ -155,9 +128,8 @@ class Predicate(Boolean):
     def remove_handler(self, handler):
         self.handlers.remove(handler)
 
-    @cacheit
-    def sort_key(self, order=None):
-        return self.class_key(), (1, (self.name,)), S.One.sort_key(), S.One
+    def apply(self):
+        return AppliedAssumptionsPredicate
 
     def eval(self, expr, assumptions=True):
         """
@@ -186,6 +158,10 @@ class Predicate(Boolean):
                         raise ValueError('incompatible resolutors')
                 break
         return res
+
+    def _sympystr(self, *args, **kwargs):
+        return "Q.%s" % self.name
+
 
 @contextmanager
 def assuming(*assumptions):
